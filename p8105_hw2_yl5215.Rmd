@@ -92,3 +92,99 @@ total_balls_mr_2020 =
 
 Therefore, the total weight of trash collected by Professor Trash Wheel is `r total_weight_prof` tons and the total number of sports balls collected by Mr. Trash Wheel in 2020 is `r total_balls_mr_2020`.
 
+# Problem 3
+
+First, clean the data in `pols-month.csv`. Use `separate()` to break up the variable `mon` into integer variables `year`, `month`, and `day`; replace month number with month name using `month.name`; create a `president` variable taking values `gop` and `dem`, and remove `prez_dem` and `prez_gop`, and `day`.
+
+```{r}
+pols_month_df = 
+  read_csv("data/fivethirtyeight_datasets/pols-month.csv") %>%
+  janitor::clean_names(dat = .) %>%
+  separate(data = ., mon, c("year", "month", "day"), sep = "-", convert = TRUE) %>%
+  arrange(year, month) %>%
+  mutate(.data = ., month = month.name[month], president = recode(prez_dem, "1" = "dem", "0" = "gop")) %>% 
+  select(-prez_dem, -prez_gop, -day)
+```
+
+Clean the data in `snp.csv` using a similar process to the above. The `year` variable is converted for better clarity and easier analysis. Arrange according to `year` and `month`, and organize so that `year` and `month` are the leading columns.
+
+```{r}
+snp_df = 
+  read_csv("data/fivethirtyeight_datasets/snp.csv") %>%
+  janitor::clean_names(dat = .) %>%
+  separate(data = ., date, c("month", "day", "year"), sep = "/", convert = TRUE) %>%
+  mutate(year = ifelse((year >= 50), year + 1900,
+year + 2000),) %>%
+  arrange(year, month) %>%
+  mutate(.data = ., month = month.name[as.integer(month)]) %>% 
+  select(year, month, close) 
+```
+
+Tidy the unemployment data so that it can be merged with the previous datasets. To do so, switch from “wide” to “long” format, and ensure that key variables have the same name and that key variables take the same values.
+
+```{r}
+unemployment_df = 
+  read_csv("data/fivethirtyeight_datasets/unemployment.csv") %>%
+  janitor::clean_names(dat = .) %>%
+  pivot_longer(
+    data = .,
+    jan:dec,
+    names_to = "month",
+    values_to = "unemployment"
+  ) %>%
+  drop_na(unemployment) %>%
+  mutate(month = recode(month,
+  'jan' = 'January',
+  'feb' = 'February',
+  'mar' = 'March',
+  'apr' = 'April',
+  'may' = 'May',
+  'jun' = 'June',
+  'jul' = 'July',
+  'aug' = 'August',
+  'sep' = 'September',
+  'oct' = 'October',
+  'nov' = 'November',
+  'dec' = 'December'),
+  year = as.integer(year), 
+  month = as.character(month))
+```
+
+Join the datasets by merging `snp` into `pols`, and merging `unemployment` into the result.
+
+```{r}
+temp_merge_df =
+  left_join(pols_month_df, snp_df, by = c("year" = "year", "month" = "month"))
+result_merge_df = 
+  left_join(temp_merge_df, unemployment_df, by = c("year" = "year", "month" = "month"))
+```
+
+To remove `NA`s in the resulting dataset:
+
+```{r}
+result_fte_df = 
+  result_merge_df %>%
+  na.omit()
+```
+
+
+```{r echo = FALSE}
+rows_pols = nrow(pols_month_df)
+cols_pols = ncol(pols_month_df)
+rows_snp = nrow(snp_df)
+cols_snp = ncol(snp_df)
+rows_unem = nrow(unemployment_df)
+cols_unem = ncol(unemployment_df)
+rows_fte = nrow(result_fte_df)
+cols_fte = ncol(result_fte_df)
+range_year_fte = max(result_fte_df$year) - min(result_fte_df$year)
+```
+
+`pols_month_df` contains `r rows_pols` rows of data (observations) and `r cols_pols` variables. The variables are `r variable.names(pols_month_df)`. Whether the politicians are democratic or republican are indicated by `president`, `gov_gop`, `sen_gop`, etc.
+
+`snp_df` contains `r rows_snp` rows of data (observations) and `r cols_snp` variables. The variables are `r variable.names(snp_df)`. The `close` variable shows the closing values of the stock index on different dates.
+
+`unemployment_df` contains `r rows_unem` rows of data (observations) and `r cols_unem` variables. The variables are `r variable.names(unemployment_df)`. `unemployment` shows unemployment rate in the associated times.
+
+The cleaned, merged dataset `result_fte_df` has `r rows_fte` rows of data (observations) and `r cols_fte` variables. It merges the variables from the 3 datasets `pols_month_df`, `snp_df`, and `unemployment_df`. The range of years recorded in this dataset is `r range_year_fte`.
+
